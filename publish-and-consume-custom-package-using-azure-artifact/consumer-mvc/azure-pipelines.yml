@@ -1,0 +1,23 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+
+- task: NuGetAuthenticate@1
+  displayName: Auth to Azure Artifacts
+
+- script: dotnet restore
+  displayName: Restore
+
+- script: dotnet build -c Release --no-restore
+  displayName: Build
+
+- script: dotnet run --project Consumer.App/Consumer.App.csproj --urls http://0.0.0.0:5000
+  displayName: Run (demo)

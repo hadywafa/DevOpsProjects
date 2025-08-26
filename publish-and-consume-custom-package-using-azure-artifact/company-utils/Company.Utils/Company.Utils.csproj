@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+
+    <!-- NuGet metadata -->
+    <PackageId>Company.Utils</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Your Team</Authors>
+    <Company>Your Company</Company>
+    <Description>Utility helpers for strings and collections.</Description>
+    <PackageTags>utilities;strings;helpers</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://dev.azure.com/ORG/PROJECT/_git/repo</RepositoryUrl>
+    <PackageProjectUrl>https://dev.azure.com/ORG/PROJECT</PackageProjectUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+  </ItemGroup>
+</Project>

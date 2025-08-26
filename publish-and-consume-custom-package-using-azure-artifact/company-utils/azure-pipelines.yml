@@ -1,0 +1,43 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  BuildConfiguration: 'Release'
+  PackageVersion: '1.0.$(Build.BuildId)'
+
+steps:
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '8.x'
+
+- script: dotnet restore
+  displayName: Restore
+
+- script: dotnet build --configuration $(BuildConfiguration) --no-restore
+  displayName: Build
+
+- script: dotnet test --configuration $(BuildConfiguration) --no-build --collect "XPlat Code Coverage"
+  displayName: Test
+
+- script: >
+    dotnet pack Company.Utils/Company.Utils.csproj
+    --configuration $(BuildConfiguration)
+    -p:PackageVersion=$(PackageVersion)
+    -p:ContinuousIntegrationBuild=true
+    -o $(Build.ArtifactStagingDirectory)
+  displayName: Pack
+
+- task: NuGetAuthenticate@1
+  displayName: Authenticate to Azure Artifacts
+
+- task: NuGetCommand@2
+  displayName: Push package to feed
+  inputs:
+    command: 'push'
+    packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
+    publishVstsFeed: 'team-utils'        # TODO: replace with your feed name
+    allowPackageConflicts: true
