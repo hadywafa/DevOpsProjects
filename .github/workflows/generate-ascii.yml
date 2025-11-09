@@ -3,6 +3,7 @@ on:
     push:
         branches: ["main"]
         paths: ["github-actions/basics-pipeline/**"]
+    # workflow_dispatch:
 jobs:
     generate-ascii:
         name: Generate ASCII Art JOB

@@ -1,17 +1,17 @@
 name: My First Workflow
 on:
-    push:
-        branches: ["main"]
-        paths: ["github-actions/basics-pipeline/**"]
-
+  push:
+    branches: ["main"]
+    paths: ["github-actions/basics-pipeline/**"]
+  workflow_dispatch:
 jobs:
-    first-job:
-        name: 📌 First Job
-        runs-on: ubuntu-latest
-        steps:
-            # - name: Checkout
-            #   uses: actions/checkout@v2
-            - name: Hello World
-              run: echo "Hello World"
-            - name: Goodbye World
-              run: echo "Goodbye World"
+  first-job:
+    name: 📌 First Job
+    runs-on: ubuntu-latest
+    steps:
+      # - name: Checkout
+      #   uses: actions/checkout@v2
+      - name: Hello World
+        run: echo "Hello World"
+      - name: Goodbye World
+        run: echo "Goodbye World"
