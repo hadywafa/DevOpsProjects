@@ -1,0 +1,22 @@
+name: Generate ASCII Art
+on:
+    push:
+        branches: ["main"]
+        paths: ["github-actions/basics-pipeline/**"]
+jobs:
+    generate-ascii:
+        name: Generate ASCII Art JOB
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repo
+              uses: actions/checkout@v4
+            - name: Install Cowsay Package
+              run: sudo apt-get install -y cowsay
+            - name: Generate ASCII Art
+              run: cowsay -f dragon "Run for cover, Iam a DRAGON...RAWR" >> dragon.txt
+            - name: Test File Exists
+              run: grep -i "dragon" dragon.txt
+            - name: Read File
+              run: cat dragon.txt
+            - name: List Repo Files
+              run: ls -ltra
