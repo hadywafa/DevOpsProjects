@@ -1,0 +1,21 @@
+name: Run Shell Script Workflow
+on:
+    push:
+        branches: ["main"]
+        paths:
+            [
+                "github-actions/basics-pipeline/**",
+                ".github/workflows/3.run-shell-script-workflow.yml",
+            ]
+jobs:
+    job-1:
+        name: 📌 Hello Script
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repo
+              uses: actions/checkout@v4
+              with:
+                  sparse-checkout: |
+                      github-actions
+            - name: Hello World
+              run: ./github-actions/basics-pipeline/hello-script.sh
