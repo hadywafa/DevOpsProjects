@@ -2,8 +2,11 @@ name: Generate ASCII Art
 on:
     push:
         branches: ["main"]
-        paths: ["github-actions/basics-pipeline/**"]
-    # workflow_dispatch:
+        paths:
+            [
+                "github-actions/basics-pipeline/**",
+                ".github/workflows/generate-ascii.yml",
+            ]
 jobs:
     generate-ascii:
         name: Generate ASCII Art JOB
