@@ -9,7 +9,7 @@ on:
       ]
 jobs:
   build-job:
-    name: 📌 1.Build Job
+    name: 1.Build Job
     runs-on: ubuntu-latest
     steps:
       - name: install Cowsay CMD
@@ -19,17 +19,17 @@ jobs:
       - name: Sleep for 30 seconds
         run: sleep 30
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dragon-artifact
           path: dragon.txt
   test-job:
-    name: 📌 2.Test Job
+    name: 2.Test Job
     needs: build-job
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dragon-artifact
       - name: Sleep for 10 seconds
@@ -37,12 +37,12 @@ jobs:
       - name: Test File Exists
         run: grep -i "dragon" dragon.txt
   deploy-job:
-    name: 📌 3.Deploy Job
+    name: 3.Deploy Job
     runs-on: ubuntu-latest
     needs: test-job
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dragon-artifact
       - name: Read File

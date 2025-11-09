@@ -9,7 +9,7 @@ on:
             ]
 jobs:
     build-job:
-        name: 📌 1.Build Job
+        name: 1.Build Job
         runs-on: ubuntu-latest
         steps:
             - name: install cowsay CMD
@@ -19,7 +19,7 @@ jobs:
             - name: Sleep for 30 seconds
               run: sleep 30
     test-job:
-        name: 📌 2.Test Job
+        name: 2.Test Job
         runs-on: ubuntu-latest
         steps:
             - name: Sleep for 10 seconds
@@ -27,7 +27,7 @@ jobs:
             - name: Test File Exists
               run: grep -i "dragon" dragon.txt
     deploy-job:
-        name: 📌 3.Deploy Job
+        name: 3.Deploy Job
         runs-on: ubuntu-latest
         steps:
             - name: Read File
