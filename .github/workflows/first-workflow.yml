@@ -2,7 +2,7 @@ name: My First Workflow
 on:
     push:
         branches: ["main"]
-        paths: ["/github-actions/basics-pipeline/**"]
+        paths: ["github-actions/basics-pipeline/**"]
 
 jobs:
     first-job:
