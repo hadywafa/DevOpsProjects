@@ -18,4 +18,6 @@ jobs:
                   sparse-checkout: |
                       github-actions
             - name: Hello World
-              run: ./github-actions/basics-pipeline/hello-script.sh
+              run: |
+                  chmod +x ./github-actions/basics-pipeline/hello-script.sh
+                  ./github-actions/basics-pipeline/hello-script.sh
