@@ -2,16 +2,29 @@ name: My First Workflow
 on:
   push:
     branches: ["main"]
-    paths: ["github-actions/basics-pipeline/**"]
+    paths:
+      [
+        "github-actions/basics-pipeline/**",
+        ".github/workflows/first-workflow.yml",
+      ]
   workflow_dispatch:
 jobs:
   first-job:
     name: 📌 First Job
     runs-on: ubuntu-latest
     steps:
-      # - name: Checkout
-      #   uses: actions/checkout@v2
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            github-actions
+            README.md
       - name: Hello World
         run: echo "Hello World"
+
+      - name: Display README.md
+        run: cat README.md
       - name: Goodbye World
         run: echo "Goodbye World"
+      - name: List Repo Files
+        run: ls -ltra
