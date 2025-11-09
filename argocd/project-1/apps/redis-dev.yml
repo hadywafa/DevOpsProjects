@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis-dev
+  namespace: argo-cd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orchida-tax-dev
+  source:
+    repoURL: oci://registry-1.docker.io/bitnamicharts/redis
+    chart: redis
+    targetRevision: 23.2.3
+    helm:
+      valueFiles:
+        - argocd/values/redis/dev.yaml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
