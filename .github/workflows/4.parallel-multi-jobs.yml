@@ -1,0 +1,36 @@
+name: Parallel Multi Job
+on:
+    push:
+        branches: ["main"]
+        paths:
+            [
+                "github-actions/basics-pipeline/**",
+                ".github/workflows/4.parallel-multi-jobs.yml",
+            ]
+jobs:
+    build-job:
+        name: 📌 1.Build Job
+        runs-on: ubuntu-latest
+        steps:
+            - name: install cowsay CMD
+              run: sudo apt-get install -y cowsay
+            - name: Execute Cowsay CMD
+              run: cowsay -f dragon "Run for cover, Iam a DRAGON...RAWR" >> dragon.txt
+            - name: Sleep for 30 seconds
+              run: sleep 30
+    test-job:
+        name: 📌 2.Test Job
+        runs-on: ubuntu-latest
+        steps:
+            - name: Sleep for 10 seconds
+              run: sleep 10
+            - name: Test File Exists
+              run: grep -i "dragon" dragon.txt
+    deploy-job:
+        name: 📌 3.Deploy Job
+        runs-on: ubuntu-latest
+        steps:
+            - name: Read File
+              run: cat dragon.txt # error if file does not exist
+            - name: Deploy
+              run: echo "Deploy Code....."
