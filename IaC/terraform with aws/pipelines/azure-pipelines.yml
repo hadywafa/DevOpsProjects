@@ -1,0 +1,231 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - IaC/terraform with aws/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - IaC/terraform with aws/**
+
+parameters:
+  - name: environment
+    displayName: Target Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - prod
+  - name: action
+    displayName: Action
+    type: string
+    default: apply
+    values:
+      - apply
+      - destroy
+
+variables:
+  - group: iac-tf-aws-secrets              # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY (marked Secret)
+  - group: iac-tf-aws-backend              # TF_BACKEND_BUCKET, TF_BACKEND_REGION, TF_BACKEND_DYNAMODB
+  - name: tfWorkingDir
+    value: IaC/terraform with aws/infra
+  - name: tfVarFile
+    value: environments/${{ parameters.environment }}.tfvars
+  - name: stateKey
+    value: aws-demo/${{ parameters.environment }}.tfstate
+  - name: TF_IN_AUTOMATION
+    value: 'true'
+
+stages:
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 1: Validate
+  # AWS credentials are injected via `env:` block on the step — NOT
+  # set as pipeline-level variables — so they are only in scope here.
+  # This is the secure pattern: secrets don't bleed into other steps.
+  # ─────────────────────────────────────────────────────────────────
+  - stage: Validate
+    displayName: Terraform Validate
+    jobs:
+      - job: TfValidate
+        displayName: terraform init + validate
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - task: TerraformInstaller@1
+            displayName: Install Terraform
+            inputs:
+              terraformVersion: '1.9.x'
+
+          - script: |
+              cd $(tfWorkingDir)
+              terraform init \
+                -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                -backend-config="key=$(stateKey)" \
+                -backend-config="region=$(TF_BACKEND_REGION)" \
+                -backend-config="dynamodb_table=$(TF_BACKEND_DYNAMODB)" \
+                -backend-config="encrypt=true" \
+                -reconfigure \
+                -input=false
+              terraform validate
+            displayName: terraform init + validate
+            env:
+              # Secrets injected only into this step via env block
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+              AWS_DEFAULT_REGION: $(TF_BACKEND_REGION)
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 2: Plan — produces binary plan artifact
+  # ─────────────────────────────────────────────────────────────────
+  - stage: Plan
+    displayName: Terraform Plan
+    dependsOn: Validate
+    jobs:
+      - job: TfPlan
+        displayName: terraform plan
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - task: TerraformInstaller@1
+            displayName: Install Terraform
+            inputs:
+              terraformVersion: '1.9.x'
+
+          - script: |
+              cd $(tfWorkingDir)
+              terraform init \
+                -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                -backend-config="key=$(stateKey)" \
+                -backend-config="region=$(TF_BACKEND_REGION)" \
+                -backend-config="dynamodb_table=$(TF_BACKEND_DYNAMODB)" \
+                -backend-config="encrypt=true" \
+                -reconfigure \
+                -input=false
+              terraform plan \
+                -var-file="$(tfVarFile)" \
+                -out="$(Build.ArtifactStagingDirectory)/tfplan" \
+                -input=false
+            displayName: terraform plan
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+              AWS_DEFAULT_REGION: $(TF_BACKEND_REGION)
+
+          - task: PublishBuildArtifacts@1
+            displayName: Publish plan artifact
+            inputs:
+              pathToPublish: $(Build.ArtifactStagingDirectory)/tfplan
+              artifactName: tfplan-aws-${{ parameters.environment }}-$(Build.BuildId)
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 3: Apply — downloads plan artifact, requires ADO approval
+  # ─────────────────────────────────────────────────────────────────
+  - stage: Apply
+    displayName: Terraform Apply (${{ parameters.environment }})
+    dependsOn: Plan
+    condition: |
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        eq('${{ parameters.action }}', 'apply')
+      )
+    jobs:
+      - deployment: TfApply
+        displayName: terraform apply
+        environment: aws-${{ parameters.environment }}
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  displayName: Install Terraform
+                  inputs:
+                    terraformVersion: '1.9.x'
+
+                - task: DownloadBuildArtifacts@1
+                  displayName: Download plan artifact
+                  inputs:
+                    buildType: current
+                    artifactName: tfplan-aws-${{ parameters.environment }}-$(Build.BuildId)
+                    downloadPath: $(System.ArtifactsDirectory)
+
+                - script: |
+                    cd $(tfWorkingDir)
+                    terraform init \
+                      -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                      -backend-config="key=$(stateKey)" \
+                      -backend-config="region=$(TF_BACKEND_REGION)" \
+                      -backend-config="dynamodb_table=$(TF_BACKEND_DYNAMODB)" \
+                      -backend-config="encrypt=true" \
+                      -reconfigure \
+                      -input=false
+                    terraform apply \
+                      -input=false \
+                      "$(System.ArtifactsDirectory)/tfplan-aws-${{ parameters.environment }}-$(Build.BuildId)/tfplan"
+                  displayName: terraform apply
+                  env:
+                    AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+                    AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+                    AWS_DEFAULT_REGION: $(TF_BACKEND_REGION)
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 4: Destroy (manual trigger only via action=destroy param)
+  # ─────────────────────────────────────────────────────────────────
+  - stage: Destroy
+    displayName: Terraform Destroy (${{ parameters.environment }})
+    dependsOn: Validate
+    condition: |
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        eq('${{ parameters.action }}', 'destroy')
+      )
+    jobs:
+      - deployment: TfDestroy
+        displayName: terraform destroy
+        environment: aws-${{ parameters.environment }}
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: TerraformInstaller@1
+                  inputs:
+                    terraformVersion: '1.9.x'
+
+                - script: |
+                    cd $(tfWorkingDir)
+                    terraform init \
+                      -backend-config="bucket=$(TF_BACKEND_BUCKET)" \
+                      -backend-config="key=$(stateKey)" \
+                      -backend-config="region=$(TF_BACKEND_REGION)" \
+                      -backend-config="dynamodb_table=$(TF_BACKEND_DYNAMODB)" \
+                      -backend-config="encrypt=true" \
+                      -reconfigure \
+                      -input=false
+                    terraform destroy \
+                      -var-file="$(tfVarFile)" \
+                      -auto-approve \
+                      -input=false
+                  displayName: terraform destroy
+                  env:
+                    AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+                    AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+                    AWS_DEFAULT_REGION: $(TF_BACKEND_REGION)

@@ -1,0 +1,172 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - IaC/bicept with azure/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - IaC/bicept with azure/**
+
+parameters:
+  - name: environment
+    displayName: Target Environment
+    type: string
+    default: dev
+    values:
+      - dev
+      - prod
+
+variables:
+  - group: iac-bicep-azure-vars            # Contains: LOCATION, PROJECT_NAME (non-secret)
+  - name: serviceConnection
+    value: sc-bicep-oidc-${{ parameters.environment }}
+  - name: mainBicep
+    value: IaC/bicept with azure/infra/main.bicep
+  - name: parametersFile
+    value: IaC/bicept with azure/infra/parameters/${{ parameters.environment }}.bicepparam
+  - name: deploymentLocation
+    value: eastus
+  - name: deploymentName
+    value: bicep-$(Build.BuildId)-${{ parameters.environment }}
+
+stages:
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 1: Lint — compile Bicep to ARM JSON (catches syntax errors)
+  # ─────────────────────────────────────────────────────────────────
+  - stage: Lint
+    displayName: Bicep Lint & Build
+    jobs:
+      - job: BicepLint
+        displayName: az bicep build
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - task: AzureCLI@2
+            displayName: Install Bicep CLI and lint
+            inputs:
+              azureSubscription: $(serviceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az bicep install
+                az bicep version
+
+                # Build validates syntax and produces an ARM JSON for review
+                az bicep build \
+                  --file "$(mainBicep)" \
+                  --outfile "$(Build.ArtifactStagingDirectory)/main-compiled.json"
+
+          - task: PublishBuildArtifacts@1
+            displayName: Publish compiled ARM JSON
+            inputs:
+              pathToPublish: $(Build.ArtifactStagingDirectory)/main-compiled.json
+              artifactName: bicep-compiled-${{ parameters.environment }}-$(Build.BuildId)
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 2: WhatIf — preview changes, publish output as artifact
+  # OIDC auth: the service connection provides a federated token —
+  # no secret is stored anywhere in ADO.
+  # ─────────────────────────────────────────────────────────────────
+  - stage: WhatIf
+    displayName: Bicep What-If (Preview)
+    dependsOn: Lint
+    jobs:
+      - job: WhatIf
+        displayName: az deployment sub what-if
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+
+          - task: AzureCLI@2
+            displayName: Run What-If
+            inputs:
+              azureSubscription: $(serviceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              inlineScript: |
+                az bicep install
+
+                mkdir -p "$(Build.ArtifactStagingDirectory)/what-if"
+
+                az deployment sub what-if \
+                  --location $(deploymentLocation) \
+                  --template-file "$(mainBicep)" \
+                  --parameters "$(parametersFile)" \
+                  --name "$(deploymentName)-whatif" \
+                  --output json \
+                  > "$(Build.ArtifactStagingDirectory)/what-if/what-if-output.json"
+
+                # Human-readable view in logs
+                az deployment sub what-if \
+                  --location $(deploymentLocation) \
+                  --template-file "$(mainBicep)" \
+                  --parameters "$(parametersFile)"
+
+          - task: PublishBuildArtifacts@1
+            displayName: Publish What-If output
+            inputs:
+              pathToPublish: $(Build.ArtifactStagingDirectory)/what-if
+              artifactName: bicep-what-if-${{ parameters.environment }}-$(Build.BuildId)
+
+  # ─────────────────────────────────────────────────────────────────
+  # Stage 3: Deploy — main branch only, requires ADO Environment approval
+  # OIDC means zero secrets in this pipeline — the service connection
+  # exchanges a short-lived token automatically.
+  # ─────────────────────────────────────────────────────────────────
+  - stage: Deploy
+    displayName: Deploy to ${{ parameters.environment }}
+    dependsOn: WhatIf
+    condition: |
+      and(
+        succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
+    jobs:
+      - deployment: DeployBicep
+        displayName: Bicep Subscription Deployment
+        environment: ${{ parameters.environment }}
+        pool:
+          vmImage: ubuntu-latest
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - task: AzureCLI@2
+                  displayName: Deploy Bicep stack
+                  inputs:
+                    azureSubscription: $(serviceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az bicep install
+
+                      az deployment sub create \
+                        --location $(deploymentLocation) \
+                        --template-file "$(mainBicep)" \
+                        --parameters "$(parametersFile)" \
+                        --name "$(deploymentName)" \
+                        --output json
+
+                - task: AzureCLI@2
+                  displayName: Show deployment outputs
+                  inputs:
+                    azureSubscription: $(serviceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az deployment sub show \
+                        --name "$(deploymentName)" \
+                        --query "properties.outputs" \
+                        --output table

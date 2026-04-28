@@ -357,3 +357,19 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/tfplan
+**/*.tfvars.local
+**/crash.log
+
+# ARM/Bicep generated outputs
+**/what-if-output/*.json
+
+# kubeconfig
+**/kubeconfig
+**/.kube/config

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environment": {
+      "type": "string",
+      "allowedValues": ["dev", "prod"],
+      "metadata": { "description": "Deployment environment." }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus",
+      "metadata": { "description": "Primary Azure region." }
+    },
+    "projectName": {
+      "type": "string",
+      "defaultValue": "armdemo",
+      "maxLength": 10,
+      "metadata": { "description": "Short project identifier used in resource names." }
+    },
+    "storageSkuName": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": ["Standard_LRS", "Standard_GRS", "Standard_ZRS"]
+    },
+    "keyVaultSkuName": {
+      "type": "string",
+      "defaultValue": "standard",
+      "allowedValues": ["standard", "premium"]
+    }
+  },
+  "variables": {
+    "resourceGroupName": "[concat('rg-', parameters('projectName'), '-', parameters('environment'), '-', parameters('location'))]",
+    "storageAccountName": "[toLower(concat('st', parameters('projectName'), parameters('environment'), uniqueString(subscription().subscriptionId, parameters('environment'))))]",
+    "storageAccountNameTrimmed": "[substring(variables('storageAccountName'), 0, min(length(variables('storageAccountName')), 24))]",
+    "keyVaultName": "[concat('kv-', parameters('projectName'), '-', parameters('environment'))]",
+    "tags": {
+      "environment": "[parameters('environment')]",
+      "project": "[parameters('projectName')]",
+      "managedBy": "arm"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('resourceGroupName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]"
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "storage-deployment",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/resourceGroups', variables('resourceGroupName'))]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "relativePath": "storage-account.json"
+        },
+        "parameters": {
+          "storageAccountName": { "value": "[variables('storageAccountNameTrimmed')]" },
+          "location": { "value": "[parameters('location')]" },
+          "skuName": { "value": "[parameters('storageSkuName')]" },
+          "tags": { "value": "[variables('tags')]" }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "keyvault-deployment",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/resourceGroups', variables('resourceGroupName'))]"
+      ],
+      "properties": {
+        "mode": "Incremental",
+        "templateLink": {
+          "relativePath": "key-vault.json"
+        },
+        "parameters": {
+          "keyVaultName": { "value": "[variables('keyVaultName')]" },
+          "location": { "value": "[parameters('location')]" },
+          "skuName": { "value": "[parameters('keyVaultSkuName')]" },
+          "tags": { "value": "[variables('tags')]" }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "resourceGroupName": {
+      "type": "string",
+      "value": "[variables('resourceGroupName')]"
+    },
+    "storageAccountId": {
+      "type": "string",
+      "value": "[reference('storage-deployment').outputs.storageAccountId.value]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "value": "[reference('keyvault-deployment').outputs.keyVaultUri.value]"
+    }
+  }
+}

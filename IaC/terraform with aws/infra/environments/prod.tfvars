@@ -1,0 +1,9 @@
+aws_region            = "us-east-1"
+environment           = "prod"
+project_name          = "awsdemo"
+vpc_cidr              = "10.1.0.0/16"
+public_subnet_cidr    = "10.1.1.0/24"
+private_subnet_cidr   = "10.1.2.0/24"
+ec2_instance_type     = "t3.small"
+allowed_ssh_cidr      = "10.0.0.0/8"  # Restrict to internal CIDR in prod
+s3_bucket_name_prefix = "demo-data"
